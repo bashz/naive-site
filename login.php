@@ -1,16 +1,24 @@
 <?php
-session_destroy();
+session_start();
 include "db/db.php";
+include "lib/utils.php";
 
 if (!empty($_GET)) {
     $email = $_GET['email'];
     $password = $_GET['password'];
-    $query = "Select * from user where email='" . $email . "'";
+    $query = "Select * from user where email='" . $email . "' and password='" . $password . "'";
+    error_log($query);
     $result = mysql_query($query) or trigger_error(mysql_error(), E_USER_ERROR);
     if ($result) {
         $user = mysql_fetch_assoc($result);
-        if ($user['password'] == $password) {
+        if ($user) {
+            session_destroy();
             session_start();
+            if ($_GET['remember']) {
+                setcookie('PHPSESSID', session_id(), time() + 780000);
+                $query = "Update user set phpsessid='" . session_id() . "' where id=" . $user['id'];
+                $result = mysql_query($query) or trigger_error(mysql_error(), E_USER_ERROR);
+            }
             $_SESSION['id'] = $user['id'];
             if ($user['is_admin'])
                 header("Location: admin.php");
@@ -21,6 +29,23 @@ if (!empty($_GET)) {
     }
     header("Location: login.php");
     exit();
+}
+
+session_destroy();
+
+if (isset($_COOKIE['PHPSESSID']) && $_COOKIE['PHPSESSID']) {
+    $query = "Select * from user where phpsessid='" . $_COOKIE['PHPSESSID'] . "'";
+    $result = mysql_query($query) or trigger_error(mysql_error(), E_USER_ERROR);
+    $user = mysql_fetch_assoc($result);
+    if ($user) {
+        session_start();
+        $_SESSION['id'] = $user['id'];
+        if ($user['is_admin'])
+            header("Location: admin.php");
+        else
+            header("Location: index.php");
+        exit();
+    }
 }
 
 $pageTitle = "Login";
@@ -44,6 +69,11 @@ include "holder/header.php";
             <button class="button helper-button reveal" tabindex="-1" type="button"><span class="mif-looks"></span></button>
         </div>
         <br>
+        <label class="input-control checkbox small-check">
+            <input type="checkbox" name="remember">
+            <span class="check"></span>
+            <span class="caption">Remember me</span>
+        </label>
         <br>
         <div class="form-actions">
             <button type="submit" class="button primary">Login</button>

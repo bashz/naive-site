@@ -1,6 +1,8 @@
 <?php
 session_start();
 include "db/db.php";
+include "lib/utils.php";
+$currentUser = isLogged();
 
 if (!empty($_POST)) {
     $user = $_SESSION['id'];
@@ -12,11 +14,20 @@ if (!empty($_POST)) {
 
     header("Location: topic.php?id=" . $topic);
     exit();
-} else {
-    $query = "Select * from topic where id=" . $_GET['id'];
+} else if (isset($_GET['id'])) {
+    $published = "is_published = 1 and";
+    if($currentUser['is_admin'])
+        $published = ""; 
+    
+    $query = "Select * from topic where $published id=" . $_GET['id'];
 
     $result = mysql_query($query) or trigger_error(mysql_error(), E_USER_ERROR);
     $topic = mysql_fetch_assoc($result);
+    if (!$topic) {
+        notFound();
+    }
+} else {
+    notFound();
 }
 
 $pageTitle = $topic['title'];
@@ -29,12 +40,20 @@ include "holder/header.php";
             <?php echo $topic['content'] ?>
         </p>
     </div>
-    <div class="row cells8">
-        <h2 class="sub-leader cell">USER</h3>
-            <p class="text-default">
-                Comment
-            </p>
-    </div>
+    
+    <?php
+    $query = "Select C.*, U.username from comment C left join user U on U.id = C.user where C.topic=" . $_GET['id'];
+
+    $result = mysql_query($query) or trigger_error(mysql_error(), E_USER_ERROR);
+    ?>
+    <?php while ($comment = mysql_fetch_assoc($result)) : ?>
+        <div class="row cells8">
+            <h2 class="sub-leader cell"><?php echo $comment['username'] ?></h2>
+            <p class="text-default"><?php echo $comment['content'] ?></p>
+        </div>
+    <?php endwhile; ?>
+    
+    <?php if($currentUser) : ?>
     <form action="topic.php" method="post">
         <div class="input-control textarea row" data-role="input" data-text-auto-resize="true" data-text-max-height="200">
             <textarea placeholder="Say something about this..." name="comment"></textarea>
@@ -42,6 +61,7 @@ include "holder/header.php";
         <input type="hidden" name="topic" value="<?php echo $topic['id'] ?>">
         <input type="submit" class="button primary" value="Submit">
     </form>
+    <?php endif; ?>
 
 </div>
 <?php include "holder/footer.php"; ?>
